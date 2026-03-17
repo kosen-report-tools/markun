@@ -1,474 +1,746 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mar君😎 - レポート作成ツール</title>
-    <link rel="icon" href="IMG_8917.ico" type="image/x-icon">
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mar君😎</title>
+<link rel="icon" href="IMG_8917.ico" type="image/x-icon">
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+  import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+  // あなたの Firebase 設定
+  const firebaseConfig = {
+    apiKey: "AIzaSyDysubyBTK7o2JvoOY-PAB8JlAY8-QZfD4",
+    authDomain: "mar-kun-app.firebaseapp.com",
+    projectId: "mar-kun-app",
+    storageBucket: "mar-kun-app.firebasestorage.app",
+    messagingSenderId: "392787998936",
+    appId: "1:392787998936:web:a0c01b3b7089e1388d3fad"
+  };
+
+  // Firebase の初期化
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const provider = new GoogleAuthProvider();
+
+  window.currentUser = null;
+
+  // --- ログイン処理 ---
+  window.login = () => {
+    signInWithPopup(auth, provider)
+      .then((result) => {
+        console.log("ログイン成功:", result.user);
+      }).catch((error) => {
+        console.error("ログイン失敗:", error);
+        if(error.code === 'auth/requests-from-referer-blocked') {
+          alert("エラー：Google Cloudの設定で 'https://kishin404.github.io/*' を許可してください。");
+        } else {
+          alert("ログインに失敗しました。");
+        }
+      });
+  };
+
+  // --- ログアウト処理 ---
+  window.logout = () => {
+    if(confirm("ログアウトしますか？")) {
+      signOut(auth).then(() => {
+        location.reload(); // 状態をリセット
+      });
+    }
+  };
+
+  // --- クラウド保存処理 ---
+  window.saveToFirestore = async (data) => {
+    if (!window.currentUser) return;
+    try {
+      await setDoc(doc(db, "users", window.currentUser.uid), {
+        reportData: JSON.stringify(data),
+        updatedAt: new Date()
+      });
+      const syncStatus = document.getElementById('syncStatus');
+      if(syncStatus) syncStatus.textContent = "✅ クラウドに保存完了";
+    } catch (e) {
+      console.error("クラウド保存エラー:", e);
+    }
+  };
+
+  // --- クラウド読み込み処理 ---
+  window.loadFromFirestore = async (uid) => {
+    try {
+      const docRef = doc(db, "users", uid);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = JSON.parse(docSnap.data().reportData);
+        if(window.applyDataToUI) {
+          window.applyDataToUI(data);
+        }
+      } else {
+        if(window.loadLocalData) window.loadLocalData();
+      }
+    } catch (e) {
+      console.error("読み込みエラー:", e);
+      if(window.loadLocalData) window.loadLocalData();
+    }
+  };
+
+  // --- ログイン状態の監視 ---
+  onAuthStateChanged(auth, async (user) => {
+    const loginBtn = document.getElementById('loginBtn');
+    const userArea = document.getElementById('userArea');
+    const syncStatus = document.getElementById('syncStatus');
+    if (user) {
+      // ログイン中
+      window.currentUser = user;
+      loginBtn.style.display = 'none';
+      userArea.style.display = 'inline-flex';
+      document.getElementById('userName').textContent = user.displayName + " さん";
+      if(syncStatus) syncStatus.textContent = "⏳ 同期中...";
+      
+      await window.loadFromFirestore(user.uid);
+      if(syncStatus) syncStatus.textContent = "✅ 同期完了";
+    } else {
+      // ログアウト中
+      window.currentUser = null;
+      loginBtn.style.display = 'inline-block';
+      userArea.style.display = 'none';
+      if(syncStatus) syncStatus.textContent = "";
+      if(window.loadLocalData) window.loadLocalData();
+    }
+  });
+</script>
+
+<style>
+  /* --- カラー定義 --- */
+  :root {
+    --mustard: #e1ad01;    
+    --blue-green: #009688;   
+    --dull-red: #b85450;     
+    --pure-red: #ff0000;     
+    --sky-blue: #1e90ff;     
+    --gray: #888888;         
     
-    <!-- Firebase SDK -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    --black: #1a1a1a;
+    --border: #000000;
+    --light-gray: #e0e0e0;   
+    
+    --bg-main: #ffffff;
+    --bg-preview: #fcfcfc;
+    --bg-box: #ffffff;
+    --text-main: #1a1a1a;
+    --border-main: #000000;
+    --guide-bg: #f5f5f5;
+    --toolbar-bg: #1a1a1a;
+    --input-bg: #ffffff;
+    --footer-bg: #1a1a1a;
+  }
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyDysubyBTK7o2JvoOY-PAB8JlAY8-QZfD4",
-            authDomain: "mar-kun-app.firebaseapp.com",
-            projectId: "mar-kun-app",
-            storageBucket: "mar-kun-app.firebasestorage.app",
-            messagingSenderId: "392787998936",
-            appId: "1:392787998936:web:a0c01b3b7089e1388d3fad"
-        };
+  body.dark-mode {
+    --bg-main: #121212;
+    --bg-preview: #1e1e1e;
+    --bg-box: #2d2d2d;
+    --text-main: #e0e0e0;
+    --border-main: #555555;
+    --guide-bg: #333333;
+    --toolbar-bg: #444444;
+    --input-bg: #2d2d2d;
+    --footer-bg: #1a1a1a;
+    --black: #e0e0e0; 
+    --border: #555555;
+    --light-gray: #444444;
+  }
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const provider = new GoogleAuthProvider();
+  body {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    margin: 0; padding: 0;
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    height: 100vh; overflow: hidden;
+    transition: background-color 0.3s, color 0.3s;
+  }
 
-        let currentUser = null;
-        let isSyncing = false;
+  .main-wrapper { display: flex; height: 100vh; width: 100%; }
 
-        window.login = () => {
-            signInWithPopup(auth, provider).catch(err => {
-                if(err.code === 'auth/requests-from-referer-blocked') {
-                    alert("エラー: Google Cloudの設定で 'kishin404.github.io/*' を許可してください。");
-                } else {
-                    alert("ログイン失敗: " + err.message);
-                }
-            });
-        };
+  .editor-side {
+    flex: 1; overflow-y: auto;
+    padding: 40px 40px 100px 40px; 
+    border-right: 3px solid var(--border-main);
+    box-sizing: border-box;
+    background-color: var(--bg-main);
+  }
 
-        window.logout = () => {
-            if (confirm("ログアウトしますか？")) {
-                signOut(auth).then(() => {
-                    localStorage.removeItem('marKunData');
-                    location.reload();
-                });
-            }
-        };
+  .preview-side {
+    flex: 1; overflow-y: auto;
+    padding: 40px;
+    background-color: var(--bg-preview);
+    box-sizing: border-box;
+  }
 
-        onAuthStateChanged(auth, async (user) => {
-            const loginBtn = document.getElementById('loginBtn');
-            const userArea = document.getElementById('userArea');
-            const syncStatus = document.getElementById('syncStatus');
+  h1 {
+    font-weight: 900; font-size: 2rem;
+    margin: 0;
+    color: var(--text-main);
+    border-bottom: 5px solid var(--pure-red); 
+    display: inline-block;
+  }
 
-            if (user) {
-                currentUser = user;
-                loginBtn.style.display = 'none';
-                userArea.style.display = 'inline-flex';
-                document.getElementById('userName').textContent = user.displayName + " さん";
-                syncStatus.textContent = "⏳ クラウド同期中...";
-                await loadFromFirestore(user.uid);
-                syncStatus.textContent = "✅ クラウド同期済み";
-            } else {
-                currentUser = null;
-                loginBtn.style.display = 'inline-block';
-                userArea.style.display = 'none';
-                syncStatus.textContent = "🌐 ローカルモード";
-                loadFromLocal();
-            }
-        });
+  .sub-title-text {
+    color: var(--pure-red); 
+    font-weight: 300;
+    font-size: 1.4rem;
+    margin: 10px 0 20px 0;
+    display: block;
+  }
 
-        window.triggerCloudSave = async (data) => {
-            if (!currentUser || isSyncing) return;
-            const syncStatus = document.getElementById('syncStatus');
-            isSyncing = true;
-            try {
-                await setDoc(doc(db, "users", currentUser.uid), {
-                    reportData: JSON.stringify(data),
-                    updatedAt: new Date()
-                });
-                syncStatus.textContent = "✅ クラウド保存完了";
-            } catch (e) {
-                syncStatus.textContent = "❌ クラウド保存失敗";
-            } finally {
-                isSyncing = false;
-            }
-        };
+  .guide-box {
+    background: var(--guide-bg);
+    padding: 15px; margin-bottom: 30px;
+    border: 1px solid var(--border-main);
+    font-size: 0.85rem;
+    border-left: 5px solid #ccc;
+  }
+  .guide-box ul { margin: 0; padding-left: 20px; }
 
-        async function loadFromFirestore(uid) {
-            const docRef = doc(db, "users", uid);
-            const docSnap = await getDoc(docRef);
-            if (docSnap.exists()) {
-                window.applyDataToUI(JSON.parse(docSnap.data().reportData));
-            } else {
-                loadFromLocal();
-            }
-        }
-    </script>
+  h2 {
+    font-size: 1.1rem; font-weight: 800;
+    margin-bottom: 15px;
+    border-bottom: 2px solid var(--black);
+    display: inline-block;
+  }
 
-    <style>
-        :root {
-            --mustard: #e1ad01; --blue-green: #009688; --dull-red: #b85450;
-            --pure-red: #ff0000; --sky-blue: #1e90ff; --gray: #888888;
-            --bg-main: #ffffff; --bg-preview: #fcfcfc; --bg-box: #ffffff;
-            --text-main: #1a1a1a; --border-main: #000000; --toolbar-bg: #1a1a1a;
-            --input-bg: #ffffff; --footer-bg: #1a1a1a; --guide-bg: #f5f5f5;
-            --black: #1a1a1a; --light-gray: #e0e0e0;
-        }
+  .input-group, .section {
+    background: var(--bg-box);
+    padding: 25px; margin-bottom: 35px;
+    border: 2px solid var(--border-main);
+    border-radius: 0 !important;
+  }
 
-        body.dark-mode {
-            --bg-main: #121212; --bg-preview: #1e1e1e; --bg-box: #2d2d2d;
-            --text-main: #e0e0e0; --border-main: #555555; --toolbar-bg: #444444;
-            --input-bg: #2d2d2d; --footer-bg: #1a1a1a; --guide-bg: #333333;
-            --black: #e0e0e0; --light-gray: #444444;
-        }
+  .field-header {
+    display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px;
+  }
 
-        body { font-family: "Helvetica Neue", Arial, sans-serif; margin: 0; background-color: var(--bg-main); color: var(--text-main); height: 100vh; overflow: hidden; transition: 0.3s; }
-        .main-wrapper { display: flex; height: 100vh; width: 100%; }
-        .editor-side { flex: 1; overflow-y: auto; padding: 40px 40px 120px 40px; border-right: 3px solid var(--border-main); box-sizing: border-box; }
-        .preview-side { flex: 1; overflow-y: auto; padding: 40px; background-color: var(--bg-preview); box-sizing: border-box; }
+  .field-header label { font-size: 0.8rem; font-weight: 700; color: var(--text-main); }
 
-        h1 { font-weight: 900; font-size: 2rem; margin: 0; border-bottom: 5px solid var(--pure-red); display: inline-block; }
-        .sub-title { color: var(--pure-red); font-weight: 300; font-size: 1.3rem; margin: 10px 0 20px 0; display: block; }
-        .header-controls { display: flex; align-items: center; gap: 10px; margin-top: 5px; }
-        
-        .btn-header { background: none; border: 1px solid var(--border-main); padding: 5px 10px; cursor: pointer; color: var(--text-main); font-weight: bold; font-size: 0.8rem; }
-        .btn-login { background: var(--sky-blue); color: white; border: none; }
-        .user-badge { display: none; align-items: center; gap: 8px; font-weight: bold; font-size: 0.85rem; }
-        .logout-link { font-size: 0.7rem; color: var(--dull-red); cursor: pointer; text-decoration: underline; }
+  .field-unit { margin-bottom: 20px; background: var(--bg-box); } 
 
-        .input-group, .section { background: var(--bg-box); padding: 25px; margin-bottom: 35px; border: 2px solid var(--border-main); border-radius: 0; position: relative; }
-        .section-title { font-weight: 900; font-size: 1.2rem; color: var(--blue-green); border-left: 10px solid var(--black); padding-left: 10px; margin-bottom: 20px; display: block; }
-        
-        .field-unit { margin-bottom: 20px; }
-        .field-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
-        .field-header label { font-size: 0.8rem; font-weight: bold; }
-        .char-count { font-size: 0.7rem; color: var(--gray); margin-left: 5px; }
+  .textarea-container { border: 1px solid var(--border-main); border-radius: 0; overflow: hidden; }
+  
+  .toolbar {
+    background: var(--toolbar-bg);
+    padding: 5px 10px;
+    display: flex; gap: 5px; flex-wrap: wrap;
+  }
 
-        .textarea-container { border: 1px solid var(--border-main); overflow: hidden; }
-        .toolbar { background: var(--toolbar-bg); padding: 5px; display: flex; gap: 5px; flex-wrap: wrap; }
-        .btn-tool { background: var(--blue-green); color: white; border: none; padding: 3px 8px; cursor: pointer; font-size: 0.75rem; }
-        textarea { width: 100%; padding: 12px; border: none; box-sizing: border-box; background: var(--input-bg); color: var(--text-main); font-family: inherit; font-size: 0.95rem; resize: none; overflow: hidden; display: block; }
-        textarea:focus { outline: none; }
+  textarea {
+    width: 100%; min-height: 50px;
+    padding: 12px; border: none; border-radius: 0;
+    box-sizing: border-box; font-size: 0.95rem;
+    resize: none; display: block; overflow: hidden;
+    background: var(--input-bg); color: var(--text-main);
+  }
+  .toolbar + textarea { min-height: 110px; font-family: monospace; }
+  textarea:focus { outline: none; background: var(--bg-main); }
 
-        .btn-field-reset { background: var(--light-gray); border: 1px solid var(--border-main); font-size: 0.7rem; padding: 2px 5px; cursor: pointer; }
-        .btn-field-delete, .btn-section-delete {
-            background: linear-gradient(to right, var(--dull-red) 50%, var(--light-gray) 50%);
-            background-size: 200% 100%; background-position: right bottom;
-            border: 1px solid var(--border-main); font-size: 0.7rem; padding: 2px 8px; cursor: pointer; font-weight: bold;
-            transition: background-position 1s linear, color 1s linear;
-        }
-        .btn-field-delete.pressing, .btn-section-delete.pressing { background-position: left bottom; color: white; }
+  button {
+    padding: 10px 20px; cursor: pointer;
+    border: 1px solid var(--border-main); border-radius: 0;
+    font-weight: 700; font-size: 0.8rem;
+    transition: opacity 0.1s;
+    text-transform: uppercase;
+  }
+  button:hover { opacity: 0.8; }
 
-        .footer-bar { position: fixed; bottom: 0; left: 0; width: 50%; height: 65px; background: var(--footer-bg); display: flex; border-top: 3px solid var(--border-main); z-index: 1000; }
-        .footer-bar button { flex: 1; border: none; font-weight: bold; cursor: pointer; font-size: 1rem; color: white; }
+  .btn-tool { background: var(--blue-green); color: #ffffff; border: none; padding: 4px 10px; font-size: 0.75rem; }
+  .btn-tool.tool-bold { font-weight: 900; }
+  .btn-tool.tool-underline { text-decoration: underline; }
+  .btn-tool.tool-highlight { background-color: #ffeb3b; color: #1a1a1a; }
 
-        #preview h1 { border-bottom: 4px solid var(--black); padding-bottom: 5px; }
-        #preview h2 { border-bottom: 2px solid var(--black); margin-top: 1.5em; }
-        #preview blockquote { border-left: 6px solid var(--mustard); padding: 10px 15px; background: var(--guide-bg); margin: 15px 0; }
-        #preview pre { background: #1e1e1e; color: #fff; padding: 15px; border-radius: 4px; overflow-x: auto; }
-        #preview mark { background: #ffeb3b; padding: 0 2px; }
+  .btn-field-reset { background: var(--light-gray); color: var(--text-main); border: 1px solid var(--border-main); padding: 2px 8px; font-size: 0.7rem; font-weight: bold; }
 
-        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; z-index: 2000; }
-        .modal-content { background: var(--bg-box); padding: 30px; border: 3px solid var(--border-main); width: 400px; box-shadow: 10px 10px 0 rgba(0,0,0,0.2); }
-    </style>
+  .btn-field-delete {
+    background: linear-gradient(to right, var(--dull-red) 50%, var(--light-gray) 50%);
+    background-size: 200% 100%;
+    background-position: right bottom;
+    color: var(--text-main); border: 1px solid var(--border-main); padding: 2px 8px; font-size: 0.7rem; font-weight: bold; cursor: pointer;
+  }
+  .btn-field-delete.pressing { background-position: left bottom; color: #fff; transition: background-position 1s linear, color 1s linear; }
+
+  .btn-action { background-color: var(--blue-green); color: white; margin-right: 5px; margin-bottom: 5px; border: none; }
+
+  .btn-delete {
+    background: linear-gradient(to right, var(--dull-red) 50%, #fff 50%);
+    background-size: 200% 100%;
+    background-position: right bottom;
+    color: var(--dull-red); border-color: var(--dull-red);
+  }
+  .btn-delete.pressing { background-position: left bottom; color: #fff; transition: background-position 1s linear, color 1s linear; opacity: 1; }
+
+  .drag-handle { cursor: grab; font-size: 1.2rem; padding: 0 10px !important; display: inline-flex; align-items: center; justify-content: center; }
+  
+  .section-title { font-weight: 900; font-size: 1.2rem; margin-bottom: 20px; display: block; color: var(--blue-green); border-left: 10px solid var(--black); padding-left: 10px; }
+
+  .section-btn-group { margin-top: 25px; padding-top: 15px; border-top: 2px dashed var(--border-main); display: flex; justify-content: space-between; align-items: flex-start; }
+
+  #initialButtons { text-align: center; padding: 40px; border: 2px dashed var(--blue-green); margin-bottom: 30px; }
+
+  #output { height: 120px; background: var(--guide-bg); border: 1px solid var(--border-main); margin-top: 10px; overflow-y: auto; }
+
+  .preview-img-placeholder { display: block; padding: 20px; background: var(--bg-box); border: 2px solid var(--blue-green); margin: 15px 0; text-align: center; font-weight: bold; color: var(--blue-green); }
+
+  .footer-bar { position: absolute; bottom: 0; left: 0; width: 50%; background: var(--footer-bg); display: flex; border-top: 3px solid var(--border-main); z-index: 1000; }
+  .footer-bar button { flex: 1; height: 60px; border: none; font-size: 1rem; }
+
+  .header-controls { display: flex; align-items: center; margin-left: 15px; gap: 10px; vertical-align: middle; }
+
+  .theme-toggle-btn, .login-btn {
+    background: none; border: 1px solid var(--border-main); font-size: 0.8rem; font-weight: bold; cursor: pointer; padding: 5px 10px; color: var(--text-main);
+  }
+  .login-btn { background-color: var(--sky-blue); color: white; border: none; }
+  
+  .user-badge { display: none; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: bold; }
+  .logout-link { font-size: 0.7rem; color: var(--dull-red); cursor: pointer; text-decoration: underline; }
+
+  .char-count { font-size: 0.8rem; font-weight: normal; color: var(--gray); margin-left: 8px; }
+  #syncStatus { font-size: 0.7rem; color: var(--gray); font-weight: normal; }
+
+  /* モーダル */
+  .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); display: none; justify-content: center; align-items: center; z-index: 2000; }
+  .modal-content { background: var(--bg-box); padding: 30px; border: 3px solid var(--border-main); width: 90%; max-width: 450px; }
+  .modal-content h3 { margin-top: 0; color: var(--text-main); border-bottom: 2px solid var(--border-main); padding-bottom: 10px; }
+  .modal-content input[type="text"], .modal-content textarea { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid var(--border-main); background: var(--input-bg); color: var(--text-main); margin-bottom: 15px; }
+</style>
 </head>
 <body>
 
 <div class="main-wrapper">
-    <div class="editor-side">
-        <span style="display: block; color: var(--pure-red); font-size: 0.8rem; font-weight: bold;">Markdownレポート爆速作成</span>
-        <div style="display: flex; align-items: center; gap: 15px;">
-            <h1>Mar君😎</h1>
-            <div class="header-controls">
-                <button class="btn-header" onclick="toggleTheme()">🌓 テーマ</button>
-                <button id="loginBtn" class="btn-header btn-login" onclick="login()">Googleログイン</button>
-                <div id="userArea" class="user-badge">
-                    <span id="userName"></span>
-                    <span class="logout-link" onclick="logout()">ログアウト</span>
-                </div>
-                <span id="syncStatus"></span>
-            </div>
+  <div class="editor-side">
+    <span style="display: block; color: var(--pure-red); font-size: 0.9rem; font-weight: bold; margin-bottom: 2px;">Markdownレポート作成ツール</span>
+    <div style="display: flex; align-items: center; margin-bottom: 10px;">
+      <h1>Mar君😎</h1>
+      <div class="header-controls">
+        <button id="themeToggleBtn" class="theme-toggle-btn" onclick="toggleTheme()">🌙 ダークモードに切り替え</button>
+        
+        <button id="loginBtn" class="login-btn" onclick="login()">Googleでログイン</button>
+        
+        <div id="userArea" class="user-badge">
+          <span id="userName"></span>
+          <span class="logout-link" onclick="logout()">ログアウト</span>
         </div>
-        <span class="sub-title">レポートをmdに。手間をゼロに。</span>
-
-        <div class="input-group">
-            <div class="field-unit">
-                <div class="field-header"><label>タイトル</label><button class="btn-field-reset" onclick="clearField('title')">リセット</button></div>
-                <textarea id="title" placeholder="第1回 実験タイトル"></textarea>
-            </div>
-            <div class="field-unit">
-                <div class="field-header"><label>名前 / 学籍番号</label><button class="btn-field-reset" onclick="clearField('name')">リセット</button></div>
-                <textarea id="name" placeholder="山田太郎 2Ixx"></textarea>
-            </div>
-            <div class="field-unit">
-                <div class="field-header"><label>目的</label><button class="btn-field-reset" onclick="clearField('purpose')">リセット</button></div>
-                <div class="textarea-container">
-                    <div class="toolbar">
-                        <button class="btn-tool" onclick="addList('-', 'purpose')">・箇条書き</button>
-                        <button class="btn-tool" onclick="insertWrap('**','**','purpose')">太字</button>
-                        <button class="btn-tool" onclick="insertWrap('<mark>','</mark>','purpose')">蛍光ペン</button>
-                    </div>
-                    <textarea id="purpose" placeholder="本実験の目的は..."></textarea>
-                </div>
-            </div>
-        </div>
-
-        <div id="mainContainer"></div>
-
-        <div style="text-align:center; padding: 20px; border: 2px dashed var(--blue-green); margin-bottom: 40px;">
-            <button class="btn-header" style="background:var(--blue-green); color:white; border:none; padding:10px 20px;" onclick="addSection('experiment')">＋ 実験セクションを追加</button>
-            <button class="btn-header" style="background:var(--blue-green); color:white; border:none; padding:10px 20px;" onclick="addSection('exercise')">＋ 演習セクションを追加</button>
-        </div>
-
-        <div class="input-group">
-            <div class="field-unit">
-                <div class="field-header"><label>感想・考察</label><span class="char-count" id="count_imp">0文字</span></div>
-                <div class="textarea-container">
-                    <div class="toolbar">
-                        <button class="btn-tool" onclick="addList('-', 'impression')">・箇条書き</button>
-                        <button class="btn-tool" onclick="insertWrap('**','**','impression')">太字</button>
-                        <button class="btn-tool" onclick="insertWrap('<mark>','</mark>','impression')">蛍光ペン</button>
-                    </div>
-                    <textarea id="impression" placeholder="実験を通して学んだことなど..." style="min-height: 120px;"></textarea>
-                </div>
-            </div>
-        </div>
-
-        <h3>Markdown Output</h3>
-        <textarea id="output" readonly style="height: 100px; background: var(--guide-bg); font-family: monospace; border: 1px solid var(--border-main);"></textarea>
+        <span id="syncStatus"></span>
+      </div>
+    </div>
+    
+    <span class="sub-title-text">コピーしたMarkdownテキストをmdファイルに貼り付けるだけ</span>
+    
+    <div class="guide-box">
+      <ul>
+        <li><strong>空欄の省略：</strong> 入力欄が空白の項目は、出力時に自動的にスキップされます。</li>
+        <li><strong>画像の挿入：</strong> 各テキストエリアに画像ファイルをドロップすると、画像タグが挿入されます。</li>
+        <li><strong>セクションの仕組み：</strong> 実験・演習ブロックはボタンで自由な位置に追加・削除が可能です。</li>
+        <li><strong>リアルタイム表示：</strong> 編集内容は右側のプレビューエリアへ即座に反映されます。</li>
+      </ul>
     </div>
 
-    <div class="preview-side">
-        <div id="preview"></div>
+    <div class="input-group">
+      <h2>基本情報</h2>
+      <div class="field-unit">
+        <div class="field-header"><label>タイトル</label><button class="btn-field-reset" onclick="clearField('title')">リセット</button></div>
+        <textarea id="title" placeholder="第1回 〇〇実験"></textarea>
+      </div>
+      <div class="field-unit">
+        <div class="field-header"><label>学籍番号</label><button class="btn-field-reset" onclick="clearField('studentId')">リセット</button></div>
+        <textarea id="studentId" placeholder="2I19"></textarea>
+      </div>
+      <div class="field-unit">
+        <div class="field-header"><label>名前</label><button class="btn-field-reset" onclick="clearField('name')">リセット</button></div>
+        <textarea id="name" placeholder="山田 太郎"></textarea>
+      </div>
+      <div class="field-unit">
+        <div class="field-header"><label>目的</label><button class="btn-field-reset" onclick="clearField('purpose')">リセット</button></div>
+        <div class="textarea-container">
+          <div class="toolbar">
+            <button class="btn-tool" onclick="addList('-', 'purpose')">・箇条書き</button>
+            <button class="btn-tool tool-bold" onclick="insertWrap('**', '**', 'purpose')">強調</button>
+            <button class="btn-tool tool-underline" onclick="insertWrap('<u>', '</u>', 'purpose')">下線</button>
+            <button class="btn-tool tool-highlight" onclick="insertWrap('<mark>', '</mark>', 'purpose')">ハイライト</button>
+          </div>
+          <textarea id="purpose"></textarea>
+        </div>
+      </div>
     </div>
+
+    <div id="mainContainer"></div>
+
+    <div id="initialButtons">
+      <button class="btn-action" onclick="addSection('experiment')">＋ 実験を追加</button>
+      <button class="btn-action" onclick="addSection('exercise')">＋ 演習を追加</button>
+    </div>
+
+    <div class="input-group">
+      <h2>全体まとめ</h2>
+      <div class="field-unit">
+        <div class="field-header"><label>感想<span class="char-count">0文字</span></label><button class="btn-field-reset" onclick="clearField('impression')">リセット</button></div>
+        <div class="textarea-container">
+          <div class="toolbar">
+            <button class="btn-tool" onclick="addList('-', 'impression')">・箇条書き</button>
+            <button class="btn-tool tool-bold" onclick="insertWrap('**', '**', 'impression')">強調</button>
+            <button class="btn-tool tool-underline" onclick="insertWrap('<u>', '</u>', 'impression')">下線</button>
+            <button class="btn-tool tool-highlight" onclick="insertWrap('<mark>', '</mark>', 'impression')">ハイライト</button>
+          </div>
+          <textarea id="impression"></textarea>
+        </div>
+      </div>
+      <div class="field-unit">
+        <div class="field-header"><label>考察（全体）<span class="char-count">0文字</span></label><button class="btn-field-reset" onclick="clearField('finalDiscussion')">リセット</button></div>
+        <div class="textarea-container">
+          <div class="toolbar">
+            <button class="btn-tool" onclick="addList('-', 'finalDiscussion')">・箇条書き</button>
+            <button class="btn-tool tool-bold" onclick="insertWrap('**', '**', 'finalDiscussion')">強調</button>
+            <button class="btn-tool tool-underline" onclick="insertWrap('<u>', '</u>', 'finalDiscussion')">下線</button>
+            <button class="btn-tool tool-highlight" onclick="insertWrap('<mark>', '</mark>', 'finalDiscussion')">ハイライト</button>
+          </div>
+          <textarea id="finalDiscussion"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <h2>Markdown Output</h2>
+    <textarea id="output" readonly></textarea>
+  </div>
+
+  <div class="preview-side">
+    <div id="preview"></div>
+  </div>
 </div>
 
 <div class="footer-bar">
-    <button style="background: var(--mustard);" onclick="openReview()">レビューを送る</button>
-    <button id="copyBtn" style="background: var(--sky-blue);" onclick="copyMD()">MDをコピー</button>
-    <button style="background: var(--dull-red);" onclick="resetAll()">全データ消去</button>
+  <button onclick="openReviewModal()" style="background: var(--mustard); color: #fff;">レビューを書く</button>
+  <button onclick="copyOutput()" id="copyBtn" style="background: var(--sky-blue); color: #fff;">Markdownをコピー</button>
+  <button onclick="resetAll()" style="background: var(--dull-red); color: #fff;">リセット</button>
 </div>
 
-<!-- モーダル -->
-<div id="revModal" class="modal">
-    <div class="modal-content">
-        <h3>Mar君😎 へのレビュー</h3>
-        <p style="font-size: 0.8rem; color: var(--gray);">このレビューは開発者にのみ直接送信されます！</p>
-        <input type="text" id="revNick" placeholder="ニックネーム" style="width:100%; padding:10px; box-sizing:border-box; border:1px solid var(--border-main); margin-bottom:15px;">
-        <textarea id="revText" placeholder="感想や改善案を教えてください！" style="height:100px; border:1px solid var(--border-main);"></textarea>
-        <div style="display:flex; gap:10px; margin-top:20px;">
-            <button onclick="sendReview()" style="flex:2; background:var(--sky-blue); color:white; border:none; padding:10px; cursor:pointer;">送信する</button>
-            <button onclick="closeReview()" style="flex:1; background:var(--light-gray); border:none; cursor:pointer;">閉じる</button>
-        </div>
+<div id="reviewModal" class="modal-overlay">
+  <div class="modal-content">
+    <h3>Mar君😎 へのレビュー</h3>
+    <p>このレビューは開発者にのみ直接送信されます！</p>
+    <input type="text" id="reviewNickname" placeholder="ニックネーム（任意）">
+    <textarea id="reviewText" placeholder="ここが使いやすい！ここを改善してほしい！など..."></textarea>
+    <div style="display: flex; gap: 10px; margin-top: 15px;">
+      <button id="submitReviewBtn" onclick="sendReview()" style="background: var(--sky-blue); color: #fff; flex: 2; border: none;">送信する</button>
+      <button onclick="closeReviewModal()" style="background: var(--light-gray); color: var(--text-main); flex: 1; border: 1px solid var(--border-main);">キャンセル</button>
     </div>
+  </div>
 </div>
-
 <script>
-    let fieldIdCounter = 0;
-    let saveDebounceTimer;
-    let deleteTimer;
+// (既存の JavaScript 処理)
+let fieldIdCounter = 0;
 
-    function toggleTheme() {
-        document.body.classList.toggle('dark-mode');
-        localStorage.setItem('marKunTheme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
+function toggleTheme() {
+  document.body.classList.toggle('dark-mode');
+  const isDark = document.body.classList.contains('dark-mode');
+  localStorage.setItem('marKunTheme', isDark ? 'dark' : 'light');
+  document.getElementById('themeToggleBtn').innerHTML = isDark ? '☀️ ライトモードに切り替え' : '🌙 ダークモードに切り替え';
+}
+
+function autoResize(textarea) {
+  if (textarea.id === "output" || textarea.id === "reviewText") return; 
+  textarea.style.height = 'auto';
+  textarea.style.height = textarea.scrollHeight + 'px';
+}
+
+function setupTextarea(textarea) {
+  textarea.addEventListener('dragover', (e) => { e.preventDefault(); textarea.classList.add('dragover'); });
+  textarea.addEventListener('dragleave', () => { textarea.classList.remove('dragover'); });
+  textarea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    textarea.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.match('image.*')) {
+      const start = textarea.selectionStart;
+      const text = `![画像:${file.name}](${file.name})\n`;
+      textarea.value = textarea.value.substring(0, start) + text + textarea.value.substring(textarea.selectionEnd);
+      textarea.selectionStart = textarea.selectionEnd = start + text.length;
+      autoResize(textarea);
+      updateAll();
     }
+  });
+}
 
-    function autoResize(ta) {
-        if (ta.id === "output") return;
-        ta.style.height = 'auto';
-        ta.style.height = ta.scrollHeight + 'px';
-    }
+function addList(prefix, targetId) {
+  const textarea = document.getElementById(targetId);
+  const start = textarea.selectionStart;
+  const text = textarea.value;
+  let insert = (start > 0 && text[start-1] !== '\n') ? `\n${prefix} ` : `${prefix} `;
+  textarea.value = text.substring(0, start) + insert + text.substring(textarea.selectionEnd);
+  textarea.selectionStart = textarea.selectionEnd = start + insert.length;
+  textarea.focus();
+  autoResize(textarea);
+  updateAll();
+}
 
-    function insertWrap(before, after, targetId) {
-        const ta = document.getElementById(targetId);
-        const start = ta.selectionStart;
-        const end = ta.selectionEnd;
-        const val = ta.value;
-        ta.value = val.substring(0, start) + before + val.substring(start, end) + after + val.substring(end);
-        ta.focus();
-        updateAll();
-    }
+function insertWrap(startTag, endTag, targetId) {
+  const textarea = document.getElementById(targetId);
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const text = textarea.value;
+  const selectedText = text.substring(start, end);
+  const insertText = startTag + selectedText + endTag;
+  textarea.value = text.substring(0, start) + insertText + text.substring(end);
+  if (selectedText.length === 0) {
+    textarea.selectionStart = textarea.selectionEnd = start + startTag.length;
+  } else {
+    textarea.selectionStart = textarea.selectionEnd = start + insertText.length;
+  }
+  textarea.focus();
+  autoResize(textarea);
+  updateAll();
+}
 
-    function addList(prefix, targetId) {
-        const ta = document.getElementById(targetId);
-        const start = ta.selectionStart;
-        const val = ta.value;
-        const insert = (start === 0 || val[start-1] === '\n') ? prefix + " " : "\n" + prefix + " ";
-        ta.value = val.substring(0, start) + insert + val.substring(start);
-        ta.focus();
-        updateAll();
-    }
+function clearField(id) {
+  const textarea = document.getElementById(id);
+  textarea.value = "";
+  autoResize(textarea);
+  updateAll();
+}
 
-    function clearField(id) {
-        document.getElementById(id).value = "";
-        updateAll();
-    }
+let deletePressTimer;
+function startDelete(btn) { btn.classList.add('pressing'); deletePressTimer = setTimeout(() => { btn.classList.remove('pressing'); deleteSection(btn); }, 1000); }
+function startDeleteField(btn) { btn.classList.add('pressing'); deletePressTimer = setTimeout(() => { btn.classList.remove('pressing'); deleteField(btn); }, 1000); }
+function cancelDelete(btn) { btn.classList.remove('pressing'); clearTimeout(deletePressTimer); }
+function deleteSection(btn) { btn.closest('.section').remove(); if(document.querySelectorAll(".section").length === 0) document.getElementById("initialButtons").style.display = "block"; updateAll(); }
+function deleteField(btn) { btn.closest('.field-unit').remove(); updateAll(); }
 
-    function addSection(type, savedData = null) {
-        const container = document.getElementById('mainContainer');
-        const secId = 'sec_' + (fieldIdCounter++);
-        const div = document.createElement('div');
-        div.className = 'section';
-        div.dataset.type = type;
-        
-        const fields = savedData ? savedData.fields : [
-            {label: '内容', value: ''},
-            {label: 'コード', value: ''},
-            {label: '結果', value: ''},
-            {label: '考察', value: ''}
-        ];
+function generateFieldHtml(targetId, labelText, value = "") {
+  const safeVal = value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return `
+    <div class="field-unit" data-label="${labelText}">
+      <div class="field-header">
+        <label>${labelText}<span class="char-count">0文字</span></label>
+        <div>
+          <button class="btn-field-reset drag-handle field-drag-handle" title="ドラッグで移動">≡</button>
+          <button class="btn-field-reset" onclick="clearField('${targetId}')">リセット</button>
+          <button class="btn-field-delete" onmousedown="startDeleteField(this)" onmouseup="cancelDelete(this)" onmouseleave="cancelDelete(this)" ontouchstart="startDeleteField(this)" ontouchend="cancelDelete(this)" oncontextmenu="return false;" title="長押しで削除">削除</button>
+        </div>
+      </div>
+      <div class="textarea-container">
+        <div class="toolbar">
+          <button class="btn-tool" onclick="addList('-', '${targetId}')">・箇条書き</button>
+          <button class="btn-tool tool-bold" onclick="insertWrap('**', '**', '${targetId}')">強調</button>
+          <button class="btn-tool tool-underline" onclick="insertWrap('<u>', '</u>', '${targetId}')">下線</button>
+          <button class="btn-tool tool-highlight" onclick="insertWrap('<mark>', '</mark>', '${targetId}')">ハイライト</button>
+        </div>
+        <textarea id="${targetId}" class="dynamic-textarea">${safeVal}</textarea>
+      </div>
+    </div>
+  `;
+}
 
-        let fieldsHtml = fields.map((f, i) => {
-            const fid = `ta_${fieldIdCounter++}`;
-            return `
-                <div class="field-unit">
-                    <div class="field-header"><label>${f.label}</label></div>
-                    <div class="textarea-container">
-                        <div class="toolbar">
-                            <button class="btn-tool" onclick="insertWrap('**','**','${fid}')">太字</button>
-                            <button class="btn-tool" onclick="insertWrap('\`','\`','${fid}')">コード</button>
-                        </div>
-                        <textarea id="${fid}" oninput="updateAll()" placeholder="${f.label}を入力...">${f.value}</textarea>
-                    </div>
-                </div>
-            `;
-        }).join('');
+function addCustomField(btn) {
+  const name = prompt("追加する項目名を入力してください:");
+  if (!name) return;
+  const container = btn.closest('.section').querySelector('.fields-container');
+  const id = 'custom' + fieldIdCounter++;
+  container.insertAdjacentHTML('beforeend', generateFieldHtml(id, name));
+  const newTextarea = document.getElementById(id);
+  setupTextarea(newTextarea);
+  autoResize(newTextarea);
+  updateAll();
+}
 
-        div.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                <span class="section-title">${type === 'experiment' ? '実験' : '演習'}</span>
-                <button class="btn-section-delete" onmousedown="startDel(this)" onmouseup="endDel(this)" onmouseleave="endDel(this)">長押し削除</button>
-            </div>
-            ${fieldsHtml}
-        `;
-        container.appendChild(div);
-        div.querySelectorAll('textarea').forEach(autoResize);
-        updateAll();
-    }
+function createSectionElement(type, fieldsData = null) {
+  const div = document.createElement("div");
+  div.className = "section";
+  div.dataset.type = type;
+  const id = fieldIdCounter++;
+  let html = `<span class="section-title"></span><div class="fields-container">`;
+  if (fieldsData) {
+    fieldsData.forEach(f => { html += generateFieldHtml(`custom${fieldIdCounter++}`, f.label, f.value); });
+  } else {
+    html += generateFieldHtml(`c${id}`, '内容');
+    html += generateFieldHtml(`code${id}`, 'コード');
+    html += generateFieldHtml(`r${id}`, '結果');
+    html += generateFieldHtml(`d${id}`, '検討');
+  }
+  html += `</div>`;
+  html += `
+    <div class="section-btn-group">
+      <div>
+        <button class="btn-action" onclick="addCustomField(this)">＋項目を追加</button>
+        <button class="btn-action" onclick="addSection('experiment', this)">＋実験を追加</button>
+        <button class="btn-action" onclick="addSection('exercise', this)">＋演習を追加</button>
+      </div>
+      <div style="display: flex; gap: 5px;">
+        <button class="btn-field-reset drag-handle section-drag-handle" title="ドラッグでセクションを移動" style="padding: 10px; font-size: 1.2rem;">≡</button>
+        <button class="btn-delete" onmousedown="startDelete(this)" onmouseup="cancelDelete(this)" onmouseleave="cancelDelete(this)" ontouchstart="startDelete(this)" ontouchend="cancelDelete(this)" oncontextmenu="return false;">長押しで削除</button>
+      </div>
+    </div>
+  `;
+  div.innerHTML = html;
+  div.querySelectorAll('textarea').forEach(setupTextarea);
+  const fieldsContainer = div.querySelector('.fields-container');
+  Sortable.create(fieldsContainer, { handle: '.field-drag-handle', animation: 150, onEnd: updateAll });
+  return div;
+}
 
-    function startDel(btn) {
-        btn.classList.add('pressing');
-        deleteTimer = setTimeout(() => {
-            btn.closest('.section').remove();
-            updateAll();
-        }, 1000);
-    }
-    function endDel(btn) {
-        btn.classList.remove('pressing');
-        clearTimeout(deleteTimer);
-    }
+function addSection(type, btn = null) {
+  const newSec = createSectionElement(type);
+  if (btn) btn.closest('.section').after(newSec);
+  else document.getElementById("mainContainer").appendChild(newSec);
+  document.getElementById("initialButtons").style.display = "none";
+  updateAll();
+}
 
-    function updateAll() {
-        const sections = document.querySelectorAll('.section');
-        let counts = { experiment: 0, exercise: 0 };
-        
-        sections.forEach(s => {
-            const t = s.dataset.type;
-            counts[t]++;
-            s.querySelector('.section-title').textContent = (t === 'experiment' ? '実験' : '演習') + " " + counts[t];
-        });
+let cloudSaveTimer = null;
 
-        const v = (id) => document.getElementById(id).value;
-        let md = `# ${v('title')}\n\n`;
-        md += `**作成者:** ${v('name')}\n\n`;
-        md += `## 目的\n> ${v('purpose')}\n\n`;
-
-        sections.forEach(sec => {
-            md += `## ${sec.querySelector('.section-title').textContent}\n\n`;
-            sec.querySelectorAll('.field-unit').forEach(unit => {
-                const label = unit.querySelector('label').textContent;
-                const val = unit.querySelector('textarea').value;
-                if (val) {
-                    if (label === 'コード') md += `### ${label}\n\`\`\`\n${val}\n\`\`\`\n\n`;
-                    else md += `### ${label}\n${val}\n\n`;
-                }
-            });
-        });
-
-        md += `## 感想・考察\n${v('impression')}\n`;
-        
-        document.getElementById('output').value = md;
-        document.getElementById('count_imp').textContent = v('impression').length + "文字";
-        
-        renderPreview(md);
-
-        // 自動保存処理（LocalStorage & Firebase）
-        clearTimeout(saveDebounceTimer);
-        saveDebounceTimer = setTimeout(saveData, 1000);
-    }
-
-    function renderPreview(md) {
-        let html = md.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-            .replace(/\n/g, '<br>')
-            .replace(/^# (.*)/gm, '<h1>$1</h1>')
-            .replace(/^## (.*)/gm, '<h2>$1</h2>')
-            .replace(/^### (.*)/gm, '<h3>$1</h3>')
-            .replace(/^&gt; (.*)/gm, '<blockquote>$1</blockquote>')
-            .replace(/&lt;mark&gt;(.*?)&lt;\/mark&gt;/g, '<mark>$1</mark>')
-            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            .replace(/```<br>([\s\S]*?)<br>```/g, '<pre>$1</pre>');
-        document.getElementById('preview').innerHTML = html;
-        document.querySelectorAll('textarea').forEach(autoResize);
-    }
-
-    function saveData() {
-        const data = {
-            title: document.getElementById('title').value,
-            name: document.getElementById('name').value,
-            purpose: document.getElementById('purpose').value,
-            impression: document.getElementById('impression').value,
-            sections: Array.from(document.querySelectorAll('.section')).map(sec => ({
-                type: sec.dataset.type,
-                fields: Array.from(sec.querySelectorAll('.field-unit')).map(unit => ({
-                    label: unit.querySelector('label').textContent,
-                    value: unit.querySelector('textarea').value
-                }))
-            }))
-        };
-        localStorage.setItem('marKunData', JSON.stringify(data));
-        if (window.triggerCloudSave) window.triggerCloudSave(data);
-    }
-
-    window.applyDataToUI = (data) => {
-        document.getElementById('title').value = data.title || '';
-        document.getElementById('name').value = data.name || '';
-        document.getElementById('purpose').value = data.purpose || '';
-        document.getElementById('impression').value = data.impression || '';
-        document.getElementById('mainContainer').innerHTML = '';
-        if (data.sections) data.sections.forEach(s => addSection(s.type, s));
-        updateAll();
-    };
-
-    function loadFromLocal() {
-        const saved = localStorage.getItem('marKunData');
-        if (saved) window.applyDataToUI(JSON.parse(saved));
-    }
-
-    function copyMD() {
-        const out = document.getElementById('output');
-        out.select();
-        document.execCommand('copy');
-        document.getElementById('copyBtn').textContent = '✅ コピー完了';
-        setTimeout(() => document.getElementById('copyBtn').textContent = 'MDをコピー', 2000);
-    }
-
-    function resetAll() {
-        if (confirm("全てのデータを消去しますか？クラウド上のデータも削除されます。")) {
-            localStorage.removeItem('marKunData');
-            location.reload();
-        }
-    }
-
-    function openReview() { document.getElementById('revModal').style.display = 'flex'; }
-    function closeReview() { document.getElementById('revModal').style.display = 'none'; }
-    function sendReview() {
-        const nick = document.getElementById('revNick').value || "名無し";
-        const text = document.getElementById('revText').value;
-        if (!text) return alert("内容を入力してください");
-        fetch("https://script.google.com/macros/s/AKfycbxtN3kEjLorW2irIgjZML7zEmpDSuVrVz_U2fwGSzLaknT87qWABd9Bo9WZecV2TGo/exec", {
-            method: 'POST',
-            body: new URLSearchParams({nickname: nick, review: text})
-        }).then(() => { alert("送信しました！"); closeReview(); });
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        if (localStorage.getItem('marKunTheme') === 'dark') toggleTheme();
-        document.querySelectorAll('textarea').forEach(autoResize);
+function saveData() {
+  const data = {
+    title: document.getElementById('title').value,
+    studentId: document.getElementById('studentId').value,
+    name: document.getElementById('name').value,
+    purpose: document.getElementById('purpose').value,
+    impression: document.getElementById('impression').value,
+    finalDiscussion: document.getElementById('finalDiscussion').value,
+    sections: []
+  };
+  document.querySelectorAll(".section").forEach(s => {
+    const secData = { type: s.dataset.type, fields: [] };
+    s.querySelectorAll('.field-unit').forEach(f => {
+      secData.fields.push({ label: f.dataset.label, value: f.querySelector("textarea").value });
     });
+    data.sections.push(secData);
+  });
+  
+  // ブラウザ（ローカル）への保存
+  localStorage.setItem('marKunData', JSON.stringify(data));
+
+  // ▼ クラウドへの保存（ログインしている場合のみ、タイマーで連続アクセスを防ぐ）
+  if (window.currentUser && window.saveToFirestore) {
+    clearTimeout(cloudSaveTimer);
+    cloudSaveTimer = setTimeout(() => {
+      window.saveToFirestore(data);
+    }, 1500); 
+  }
+}
+
+function updateAll() {
+  const sections = document.querySelectorAll(".section");
+  let counts = { experiment: 0, exercise: 0 };
+  sections.forEach(s => counts[s.dataset.type]++);
+  let current = { experiment: 0, exercise: 0 };
+  sections.forEach(s => {
+    const type = s.dataset.type;
+    current[type]++;
+    const label = type === 'experiment' ? (counts.experiment > 1 ? `実験${current.experiment}` : "実験") : (counts.exercise > 1 ? `演習${current.exercise}` : "演習");
+    s.querySelector(".section-title").textContent = label;
+  });
+
+  let md = "";
+  const v = (id) => document.getElementById(id).value;
+  if (v('title')) md += `# ${v('title')}\n\n`;
+  if (v('studentId') || v('name')) md += `${v('studentId')} ${v('name')}\n\n`;
+  if (v('purpose')) md += `## 目的\n> ${v('purpose')}\n\n`;
+
+  sections.forEach(s => {
+    md += `## ${s.querySelector(".section-title").textContent}\n\n`;
+    s.querySelectorAll(".field-unit").forEach(f => {
+      const labelText = f.dataset.label;
+      const val = f.querySelector("textarea").value;
+      if (val) {
+        if (labelText === "内容") md += `### ${labelText}\n> ${val}\n\n`;
+        else if (labelText === "コード") md += `### ${labelText}\n\`\`\`\n${val}\n\`\`\`\n\n`; 
+        else md += `### ${labelText}\n${val}\n\n`;
+      }
+    });
+  });
+
+  if (v('impression')) md += `## 感想\n${v('impression')}\n\n`;
+  if (v('finalDiscussion')) md += `## 考察\n${v('finalDiscussion')}\n\n`;
+  document.getElementById("output").value = md;
+  
+  document.querySelectorAll('textarea:not(#output):not(#reviewText)').forEach(ta => {
+    const fieldUnit = ta.closest('.field-unit');
+    if(fieldUnit) {
+      const span = fieldUnit.querySelector('.char-count');
+      if(span) {
+        const count = ta.value.replace(/\s/g, '').length;
+        span.textContent = count + '文字';
+      }
+    }
+  });
+  
+  let html = md.replace(/</g, "&lt;").replace(/>/g, "&gt;")
+               .replace(/&lt;u&gt;/g, "<u>").replace(/&lt;\/u&gt;/g, "</u>")
+               .replace(/&lt;mark&gt;/g, "<mark>").replace(/&lt;\/mark&gt;/g, "</mark>")
+               .replace(/```\n?([\s\S]*?)\n?```/gm, (match, p1) => "<pre><code>" + p1 + "</code></pre>")
+               .replace(/^### (.*$)/gim, "<h3>$1</h3>")
+               .replace(/^## (.*$)/gim, "<h2>$1</h2>")
+               .replace(/^# (.*$)/gim, "<h1>$1</h1>")
+               .replace(/^&gt; (.*$)/gim, "<blockquote>$1</blockquote>")
+               .replace(/!\[(.*?)\]\((.*?)\)/gim, `<div class="preview-img-placeholder">📷 画像: $2</div>`)
+               .replace(/^- (.*$)/gim, "<li>$1</li>")
+               .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>"); 
+  let parts = html.split(/(<pre><code>[\s\S]*?<\/code><\/pre>)/);
+  for(let i=0; i<parts.length; i++) { if(!parts[i].startsWith("<pre>")) parts[i] = parts[i].replace(/\n/g, "<br>"); }
+  document.getElementById("preview").innerHTML = parts.join("");
+  saveData();
+}
+
+function copyOutput(){ navigator.clipboard.writeText(document.getElementById("output").value).then(() => { document.getElementById("copyBtn").textContent = "コピー完了！"; setTimeout(() => document.getElementById("copyBtn").textContent = "Markdownをコピー", 1500); }); }
+
+function resetAll(){ if(confirm("全て消去しますか？（保存されたデータも消去されます）")) { localStorage.removeItem('marKunData'); location.reload(); } }
+
+function openReviewModal() { document.getElementById('reviewModal').style.display = 'flex'; }
+function closeReviewModal() { document.getElementById('reviewModal').style.display = 'none'; document.getElementById('reviewNickname').value = ''; document.getElementById('reviewText').value = ''; }
+function sendReview() {
+  const nickname = document.getElementById('reviewNickname').value || "名無し";
+  const text = document.getElementById('reviewText').value;
+  if(!text) { alert("レビュー内容を入力してください。"); return; }
+  const submitBtn = document.getElementById('submitReviewBtn');
+  submitBtn.textContent = "送信中..."; submitBtn.disabled = true;
+  const endpoint = "https://script.google.com/macros/s/AKfycbxtN3kEjLorW2irIgjZML7zEmpDSuVrVz_U2fwGSzLaknT87qWABd9Bo9WZecV2TGo/exec";
+  const formData = new URLSearchParams();
+  formData.append('nickname', nickname); formData.append('review', text);
+  fetch(endpoint, { method: 'POST', body: formData }).then(() => { alert("レビューを送信しました！ありがとうございます😎"); closeReviewModal(); }).catch(() => { alert("送信に失敗しました。"); }).finally(() => { submitBtn.textContent = "送信する"; submitBtn.disabled = false; });
+}
+
+// UIにデータを反映させる共通処理
+window.applyDataToUI = function(data) {
+  ['title', 'studentId', 'name', 'purpose', 'impression', 'finalDiscussion'].forEach(id => { 
+    if (data[id]) { document.getElementById(id).value = data[id]; } 
+  });
+  if (data.sections && data.sections.length > 0) {
+    document.getElementById("mainContainer").innerHTML = ""; 
+    document.getElementById("initialButtons").style.display = "none";
+    data.sections.forEach(secData => { 
+      document.getElementById("mainContainer").appendChild(createSectionElement(secData.type, secData.fields)); 
+    });
+  }
+  document.querySelectorAll("textarea:not(#output)").forEach(el => { autoResize(el); });
+  updateAll();
+};
+
+window.loadLocalData = function() {
+  const theme = localStorage.getItem('marKunTheme');
+  if (theme === 'dark') { document.body.classList.add('dark-mode'); document.getElementById('themeToggleBtn').innerHTML = '☀️ ライトモードに切り替え'; }
+  const saved = localStorage.getItem('marKunData');
+  if (!saved) return;
+  try {
+    window.applyDataToUI(JSON.parse(saved));
+  } catch(e) { console.error(e); }
+};
+
+document.addEventListener("DOMContentLoaded", () => {
+  // onAuthStateChangedが発火するまでの繋ぎとしてローカルを読んでおく
+  window.loadLocalData();
+  document.querySelectorAll("textarea:not(#output)").forEach(el => { setupTextarea(el); autoResize(el); });
+  Sortable.create(document.getElementById('mainContainer'), { handle: '.section-drag-handle', animation: 150, onEnd: updateAll });
+  updateAll();
+});
+document.addEventListener("input", (e) => { if(e.target.tagName === "TEXTAREA") { autoResize(e.target); updateAll(); } });
 </script>
 
 </body>
