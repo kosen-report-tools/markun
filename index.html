@@ -337,6 +337,47 @@
   .modal-content { background: var(--bg-box); padding: 30px; border: 3px solid var(--border-main); width: 90%; max-width: 450px; }
   .modal-content h3 { margin-top: 0; color: var(--text-main); border-bottom: 2px solid var(--border-main); padding-bottom: 10px; }
   .modal-content input[type="text"], .modal-content textarea { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid var(--border-main); background: var(--input-bg); color: var(--text-main); margin-bottom: 15px; }
+  /* =========================================
+   プレビュー画面（Markdown風）のデザイン
+  ========================================= */
+
+  /* ▼ H2（##）と H3（###）のメリハリをつける ▼ */
+  #preview h2 {
+    font-size: 1.5rem;               /* H2をしっかり大きく */
+    border-bottom: 1px solid #ddd;   /* 下線を引いて大見出し感を強調 */
+    padding-bottom: 0.3em;
+    margin-top: 1.5em;
+    margin-bottom: 16px;
+  }
+
+  #preview h3 {
+    font-size: 1.2rem;               /* H3は少し控えめに */
+    margin-top: 1.2em;
+    margin-bottom: 16px;
+  }
+
+  /* ▼ 引用（>）を本物のMarkdown風にする ▼ */
+  #preview blockquote {
+    border-left: 4px solid #dfe2e5;  /* 左側の縦線（太めのグレー） */
+    background-color: #f6f8fa;       /* 薄いグレーの背景色 */
+    padding: 0.5em 1em;              /* 内側の余白 */
+    margin: 1em 0;                   /* 外側の余白 */
+    color: #6a737d;                  /* 文字の色を少し落ち着かせる */
+    border-radius: 0 4px 4px 0;      /* 右側だけ少し角丸にするおまけ */
+  }
+
+  /* =========================================
+   ダークモード時のプレビュー画面の色調整
+  ========================================= */
+  body.dark-mode #preview h2 {
+    border-bottom-color: #444;       /* 下線を暗いグレーに */
+  }
+
+  body.dark-mode #preview blockquote {
+    border-left-color: #555;         /* 左の縦線を暗いグレーに */
+    background-color: #2d333b;       /* 背景を暗い色に */
+    color: #adbac7;                  /* 文字色を見やすい明るさに */
+  }
 </style>
 </head>
 <body>
