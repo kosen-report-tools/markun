@@ -115,6 +115,31 @@
 </script>
 
 <style>
+  /* ▼ 淡い水色のサブボタン（項目追加・独自小見出し用） ▼ */
+  .btn-action-sub {
+    background-color: #e1f5fe; /* 淡い水色 */
+    color: #0277bd;            /* 文字は少し濃い青で読みやすく */
+    border: 1px solid #b3e5fc;
+    border-radius: 4px;
+    padding: 6px 12px;         /* 普通のボタンより少し小さく */
+    font-size: 0.85rem;        /* 文字も少し小さく */
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.2s ease;
+  }
+  .btn-action-sub:hover {
+    background-color: #b3e5fc; /* ホバーで少し濃く */
+  }
+
+  /* ダークモード時の調整 */
+  body.dark-mode .btn-action-sub {
+    background-color: #0277bd;
+    color: #e1f5fe;
+    border-color: #01579b;
+  }
+  body.dark-mode .btn-action-sub:hover {
+    background-color: #01579b;
+  }
   /* --- カラー定義 --- */
   :root {
     --mustard: #e1ad01;    
@@ -376,11 +401,15 @@
 
     <div id="mainContainer"></div>
 
-    <div id="initialButtons" class="action-buttons">
-      <button class="btn-action" onclick="addSection('experiment')">＋実験を追加</button>
-      <button class="btn-action" onclick="addSection('exercise')">＋演習を追加</button>
-      <button class="btn-action" onclick="addCustomSection()">＋独自セクション</button>
-      <button class="btn-action" style="opacity: 0.7;" onclick="addStandaloneSubheading()">＋独自小見出し</button>
+    <div id="initialButtons" class="action-buttons" style="display: flex; flex-direction: column; gap: 8px; align-items: center;">
+      <div>
+        <button class="btn-action" onclick="addSection('experiment')">＋実験を追加</button>
+        <button class="btn-action" onclick="addSection('exercise')">＋演習を追加</button>
+        <button class="btn-action" onclick="addCustomSection()">＋独自セクション</button>
+      </div>
+      <div>
+        <button class="btn-action-sub" onclick="addStandaloneSubheading()">＋独自小見出し</button>
+      </div>
     </div>
     <div class="input-group">
       <h2>全体まとめ</h2>
@@ -574,23 +603,29 @@ function createSectionElement(type, fieldsData = null, customName = "") {
     html += generateFieldHtml(`r${id}`, '結果');
     html += generateFieldHtml(`d${id}`, '検討');
   }
+  // ...上のコード...
   html += `</div>`;
   html += `
-    <div class="section-btn-group">
-      <div>
-        <button class="btn-action" onclick="addCustomField(this)">＋項目を追加</button>
-        <button class="btn-action" onclick="addSection('experiment', this)">＋実験を追加</button>
-        <button class="btn-action" onclick="addSection('exercise', this)">＋演習を追加</button>
-        <button class="btn-action" onclick="addCustomSection(this)">＋独自セクション</button>
-        <button class="btn-action" style="opacity: 0.7;" onclick="addStandaloneSubheading(this)">＋独自小見出し</button>
+    <div class="section-btn-group" style="align-items: flex-start;">
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div>
+          <button class="btn-action" onclick="addSection('experiment', this)">＋実験を追加</button>
+          <button class="btn-action" onclick="addSection('exercise', this)">＋演習を追加</button>
+          <button class="btn-action" onclick="addCustomSection(this)">＋独自セクション</button>
+        </div>
+        <div>
+          <button class="btn-action-sub" onclick="addCustomField(this)">＋項目を追加</button>
+          <button class="btn-action-sub" onclick="addStandaloneSubheading(this)">＋独自小見出し</button>
+        </div>
       </div>
-      <div style="display: flex; gap: 5px;">
-        <button class="btn-field-reset drag-handle section-drag-handle" title="ドラッグでセクションを移動" style="padding: 10px; font-size: 1.2rem;">≡</button>
+      <div style="display: flex; gap: 5px; height: 100%; align-items: flex-end;">
+        <button class="btn-field-reset drag-handle section-drag-handle" title="ドラッグで移動" style="padding: 10px; font-size: 1.2rem;">≡</button>
         <button class="btn-delete" onmousedown="startDelete(this)" onmouseup="cancelDelete(this)" onmouseleave="cancelDelete(this)" ontouchstart="startDelete(this)" ontouchend="cancelDelete(this)" oncontextmenu="return false;">長押しで削除</button>
       </div>
     </div>
   `;
   div.innerHTML = html;
+  // ...下のコード...
   div.querySelectorAll('textarea').forEach(setupTextarea);
   const fieldsContainer = div.querySelector('.fields-container');
   Sortable.create(fieldsContainer, { handle: '.field-drag-handle', animation: 150, onEnd: updateAll });
@@ -655,20 +690,25 @@ function createSubheadingElement(name, value = "") {
         <textarea id="${id}" class="dynamic-textarea">${safeVal}</textarea>
       </div>
     </div>
-    <div class="section-btn-group">
-      <div>
-        <button class="btn-action" onclick="addSection('experiment', this)">＋実験を追加</button>
-        <button class="btn-action" onclick="addSection('exercise', this)">＋演習を追加</button>
-        <button class="btn-action" onclick="addCustomSection(this)">＋独自セクション</button>
-        <button class="btn-action" style="opacity: 0.7;" onclick="addStandaloneSubheading(this)">＋独自小見出し</button>
+    <div class="section-btn-group" style="align-items: flex-start;">
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div>
+          <button class="btn-action" onclick="addSection('experiment', this)">＋実験を追加</button>
+          <button class="btn-action" onclick="addSection('exercise', this)">＋演習を追加</button>
+          <button class="btn-action" onclick="addCustomSection(this)">＋独自セクション</button>
+        </div>
+        <div>
+          <button class="btn-action-sub" onclick="addStandaloneSubheading(this)">＋独自小見出し</button>
+        </div>
       </div>
-      <div style="display: flex; gap: 5px;">
+      <div style="display: flex; gap: 5px; height: 100%; align-items: flex-end;">
         <button class="btn-field-reset drag-handle section-drag-handle" title="ドラッグで移動" style="padding: 10px; font-size: 1.2rem;">≡</button>
         <button class="btn-delete" onmousedown="startDelete(this)" onmouseup="cancelDelete(this)" onmouseleave="cancelDelete(this)" ontouchstart="startDelete(this)" ontouchend="cancelDelete(this)" oncontextmenu="return false;">長押しで削除</button>
       </div>
     </div>
-  `;
+    `;
   div.innerHTML = html;
+  // ...下のコード...
   div.querySelectorAll('textarea').forEach(setupTextarea); // 入力欄の自動リサイズなどを有効化
   return div;
 }
