@@ -639,16 +639,33 @@ function updateAll() {
   });
 
   let md = "";
-  
-  // ▼変更点1：基礎項目の取得時に「改行」を「 \ + 改行」に自動変換する
-  const v = (id) => {
-    let text = document.getElementById(id).value;
-    return text.replace(/\n/g, "\\\n"); 
+
+  // ① 普通に入力値を取得する関数（ここではまだ \ をつけない）
+  const v = (id) => document.getElementById(id).value;
+
+  // ② すべての改行に \ をつける関数（通常項目用）
+  const addSlash = (text) => text.replace(/\n/g, "\\\n");
+
+  // ③ ★今回の目玉★：目的と内容のための専用フォーマット関数！
+  const formatQuoteAndText = (text) => {
+    if (!text) return "";
+    const lines = text.split('\n'); // 文章を「改行」ごとに切り刻んで配列（リスト）にする
+    let result = `> ${lines[0]}`;   // 1行目には絶対 > をつける
+    
+    if (lines.length > 1) {
+      // 2行目以降がある場合
+      result += "\n"; // 1回目の改行には \ をつけない！（これで > から脱出）
+      // 2行目から最後までを、\ 付きの改行で合体させる
+      result += lines.slice(1).join("\\\n"); 
+    }
+    return result;
   };
 
   if (v('title')) md += `# ${v('title')}\n\n`;
   if (v('studentId') || v('name')) md += `${v('studentId')} ${v('name')}\n\n`;
-  if (v('purpose')) md += `## 目的\n> ${v('purpose')}\n\n`;
+  
+  // ▼ 目的欄に専用フォーマットを適用！
+  if (v('purpose')) md += `## 目的\n${formatQuoteAndText(v('purpose'))}\n\n`;
 
   sections.forEach(s => {
     md += `## ${s.querySelector(".section-title").textContent}\n\n`;
@@ -657,22 +674,23 @@ function updateAll() {
       let val = f.querySelector("textarea").value;
       
       if (val) {
-        // ▼変更点2：コードブロック「以外」にだけ \ をつけるように条件分岐！
         if (labelText === "コード") {
           md += `### ${labelText}\n\`\`\`\n${val}\n\`\`\`\n\n`; 
         } else if (labelText === "内容") {
-          val = val.replace(/\n/g, "\\\n");
-          md += `### ${labelText}\n> ${val}\n\n`;
+          // ▼ 内容欄にも専用フォーマットを適用！
+          md += `### ${labelText}\n${formatQuoteAndText(val)}\n\n`;
         } else {
-          val = val.replace(/\n/g, "\\\n");
-          md += `### ${labelText}\n${val}\n\n`;
+          // それ以外の項目は、普通の \ つき改行にする
+          md += `### ${labelText}\n${addSlash(val)}\n\n`;
         }
       }
     });
   });
 
-  if (v('impression')) md += `## 感想\n${v('impression')}\n\n`;
-  if (v('finalDiscussion')) md += `## 考察\n${v('finalDiscussion')}\n\n`;
+  // 感想と考察にも \ つき改行を適用
+  if (v('impression')) md += `## 感想\n${addSlash(v('impression'))}\n\n`;
+  if (v('finalDiscussion')) md += `## 考察\n${addSlash(v('finalDiscussion'))}\n\n`;
+  
   document.getElementById("output").value = md;
   
   document.querySelectorAll('textarea:not(#output):not(#reviewText)').forEach(ta => {
@@ -697,10 +715,11 @@ function updateAll() {
                  .replace(/!\[(.*?)\]\((.*?)\)/gim, `<div class="preview-img-placeholder">📷 画像: $2</div>`)
                  .replace(/^- (.*$)/gim, "<li>$1</li>")
                  .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>"); 
+                 
   let parts = html.split(/(<pre><code>[\s\S]*?<\/code><\/pre>)/);
   for(let i=0; i<parts.length; i++) { 
     if(!parts[i].startsWith("<pre>")) {
-      // ▼変更点3：プレビュー画面に \ がそのまま表示されないように、\ を消してから改行する
+      // プレビュー画面では \ が見えないように消去して改行
       parts[i] = parts[i].replace(/\\\n/g, "<br>").replace(/\n/g, "<br>"); 
     }
   }
