@@ -376,9 +376,10 @@
 
     <div id="mainContainer"></div>
 
-    <div id="initialButtons">
-      <button class="btn-action" onclick="addSection('experiment')">＋ 実験を追加</button>
-      <button class="btn-action" onclick="addSection('exercise')">＋ 演習を追加</button>
+    <div id="initialButtons" class="action-buttons">
+      <button class="btn-action" onclick="addSection('experiment')">＋実験を追加</button>
+      <button class="btn-action" onclick="addSection('exercise')">＋演習を追加</button>
+      <button class="btn-action" onclick="addCustomSection()">＋独自セクション</button>
     </div>
 
     <div class="input-group">
@@ -552,10 +553,17 @@ function addCustomField(btn) {
   updateAll();
 }
 
-function createSectionElement(type, fieldsData = null) {
+// ▼ これでまるごと上書き！
+function createSectionElement(type, fieldsData = null, customName = "") {
   const div = document.createElement("div");
   div.className = "section";
   div.dataset.type = type;
+  
+  // ★独自セクションの場合は名前を記憶する
+  if (type === 'custom' && customName) {
+    div.dataset.customName = customName;
+  }
+  
   const id = fieldIdCounter++;
   let html = `<span class="section-title"></span><div class="fields-container">`;
   if (fieldsData) {
@@ -573,6 +581,7 @@ function createSectionElement(type, fieldsData = null) {
         <button class="btn-action" onclick="addCustomField(this)">＋項目を追加</button>
         <button class="btn-action" onclick="addSection('experiment', this)">＋実験を追加</button>
         <button class="btn-action" onclick="addSection('exercise', this)">＋演習を追加</button>
+        <button class="btn-action" onclick="addCustomSection(this)">＋独自セクション</button>
       </div>
       <div style="display: flex; gap: 5px;">
         <button class="btn-field-reset drag-handle section-drag-handle" title="ドラッグでセクションを移動" style="padding: 10px; font-size: 1.2rem;">≡</button>
@@ -595,6 +604,19 @@ function addSection(type, btn = null) {
   updateAll();
 }
 
+// ▼ 新しく追加する関数
+function addCustomSection(btn = null) {
+  const name = prompt("追加するセクション名を入力してください\n（例：事前課題、参考文献、使用器具 など）:");
+  if (!name) return; // キャンセルされたら何もしない
+  
+  const newSec = createSectionElement('custom', null, name);
+  if (btn) btn.closest('.section').after(newSec);
+  else document.getElementById("mainContainer").appendChild(newSec);
+  
+  document.getElementById("initialButtons").style.display = "none";
+  updateAll();
+}
+
 let cloudSaveTimer = null;
 
 function saveData() {
@@ -609,16 +631,18 @@ function saveData() {
   };
   document.querySelectorAll(".section").forEach(s => {
     const secData = { type: s.dataset.type, fields: [] };
+    // ★独自セクションの名前を保存データに混ぜる
+    if (s.dataset.type === 'custom') {
+      secData.customName = s.dataset.customName;
+    }
     s.querySelectorAll('.field-unit').forEach(f => {
       secData.fields.push({ label: f.dataset.label, value: f.querySelector("textarea").value });
     });
     data.sections.push(secData);
   });
   
-  // ブラウザ（ローカル）への保存
   localStorage.setItem('marKunData', JSON.stringify(data));
 
-  // ▼ クラウドへの保存（ログインしている場合のみ、タイマーで連続アクセスを防ぐ）
   if (window.currentUser && window.saveToFirestore) {
     clearTimeout(cloudSaveTimer);
     cloudSaveTimer = setTimeout(() => {
@@ -629,34 +653,48 @@ function saveData() {
 
 function updateAll() {
   const sections = document.querySelectorAll(".section");
-  let counts = { experiment: 0, exercise: 0 };
-  sections.forEach(s => counts[s.dataset.type]++);
-  let current = { experiment: 0, exercise: 0 };
+  
+  // セクションの数を数える（customも追加）
+  let counts = { experiment: 0, exercise: 0, custom: 0 };
+  sections.forEach(s => {
+    if (counts[s.dataset.type] !== undefined) counts[s.dataset.type]++;
+  });
+  
+  // セクションのタイトル（見出し）を決める
+  let current = { experiment: 0, exercise: 0, custom: 0 };
   sections.forEach(s => {
     const type = s.dataset.type;
-    current[type]++;
-    const label = type === 'experiment' ? (counts.experiment > 1 ? `実験${current.experiment}` : "実験") : (counts.exercise > 1 ? `演習${current.exercise}` : "演習");
+    let label = "";
+    
+    if (type === "custom") {
+      // 独自セクションならユーザーが入力した名前にする
+      label = s.dataset.customName || "独自セクション";
+    } else {
+      current[type]++;
+      label = type === 'experiment' ? (counts.experiment > 1 ? `実験${current.experiment}` : "実験") : (counts.exercise > 1 ? `演習${current.exercise}` : "演習");
+    }
     s.querySelector(".section-title").textContent = label;
   });
 
   let md = "";
 
-  // ① 普通に入力値を取得する関数（ここではまだ \ をつけない）
-  const v = (id) => document.getElementById(id).value;
+  // ① 普通に入力値を取得する関数
+  const v = (id) => {
+    const el = document.getElementById(id);
+    return el ? el.value : "";
+  };
 
   // ② すべての改行に \ をつける関数（通常項目用）
-  const addSlash = (text) => text.replace(/\n/g, "\\\n");
+  const addSlash = (text) => text ? text.replace(/\n/g, "\\\n") : "";
 
-  // ③ ★今回の目玉★：目的と内容のための専用フォーマット関数！
+  // ③ 目的と内容のための専用フォーマット関数（1行目は引用、2行目以降は普通）
   const formatQuoteAndText = (text) => {
     if (!text) return "";
-    const lines = text.split('\n'); // 文章を「改行」ごとに切り刻んで配列（リスト）にする
-    let result = `> ${lines[0]}`;   // 1行目には絶対 > をつける
+    const lines = text.split('\n'); 
+    let result = `> ${lines[0]}`;   
     
     if (lines.length > 1) {
-      // 2行目以降がある場合
-      result += "\n"; // 1回目の改行には \ をつけない！（これで > から脱出）
-      // 2行目から最後までを、\ 付きの改行で合体させる
+      result += "\n"; // 1回目の改行には \ をつけない
       result += lines.slice(1).join("\\\n"); 
     }
     return result;
@@ -665,7 +703,7 @@ function updateAll() {
   if (v('title')) md += `# ${v('title')}\n\n`;
   if (v('studentId') || v('name')) md += `${v('studentId')} ${v('name')}\n\n`;
   
-  // ▼ 目的欄に専用フォーマットを適用！
+  // 目的欄に専用フォーマットを適用
   if (v('purpose')) md += `## 目的\n${formatQuoteAndText(v('purpose'))}\n\n`;
 
   sections.forEach(s => {
@@ -678,22 +716,22 @@ function updateAll() {
         if (labelText === "コード") {
           md += `### ${labelText}\n\`\`\`\n${val}\n\`\`\`\n\n`; 
         } else if (labelText === "内容") {
-          // ▼ 内容欄にも専用フォーマットを適用！
+          // 内容欄にも専用フォーマットを適用
           md += `### ${labelText}\n${formatQuoteAndText(val)}\n\n`;
         } else {
-          // それ以外の項目は、普通の \ つき改行にする
+          // それ以外の項目は、普通の \ つき改行
           md += `### ${labelText}\n${addSlash(val)}\n\n`;
         }
       }
     });
   });
 
-  // 感想と考察にも \ つき改行を適用
   if (v('impression')) md += `## 感想\n${addSlash(v('impression'))}\n\n`;
   if (v('finalDiscussion')) md += `## 考察\n${addSlash(v('finalDiscussion'))}\n\n`;
   
   document.getElementById("output").value = md;
   
+  // 文字数のカウント処理
   document.querySelectorAll('textarea:not(#output):not(#reviewText)').forEach(ta => {
     const fieldUnit = ta.closest('.field-unit');
     if(fieldUnit) {
@@ -705,6 +743,7 @@ function updateAll() {
     }
   });
   
+  // プレビュー画面用のHTML変換処理
   let html = md.replace(/</g, "&lt;").replace(/>/g, "&gt;")
                  .replace(/&lt;u&gt;/g, "<u>").replace(/&lt;\/u&gt;/g, "</u>")
                  .replace(/&lt;mark&gt;/g, "<mark>").replace(/&lt;\/mark&gt;/g, "</mark>")
@@ -713,6 +752,7 @@ function updateAll() {
                  .replace(/^## (.*$)/gim, "<h2>$1</h2>")
                  .replace(/^# (.*$)/gim, "<h1>$1</h1>")
                  .replace(/^&gt; (.*$)/gim, "<blockquote>$1</blockquote>")
+                 .replace(/\\<\/blockquote>/g, "</blockquote>")
                  .replace(/!\[(.*?)\]\((.*?)\)/gim, `<div class="preview-img-placeholder">📷 画像: $2</div>`)
                  .replace(/^- (.*$)/gim, "<li>$1</li>")
                  .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>"); 
@@ -720,11 +760,12 @@ function updateAll() {
   let parts = html.split(/(<pre><code>[\s\S]*?<\/code><\/pre>)/);
   for(let i=0; i<parts.length; i++) { 
     if(!parts[i].startsWith("<pre>")) {
-      // プレビュー画面では \ が見えないように消去して改行
       parts[i] = parts[i].replace(/\\\n/g, "<br>").replace(/\n/g, "<br>"); 
     }
   }
   document.getElementById("preview").innerHTML = parts.join("");
+  
+  // 最後にセーブ
   saveData();
 }
 
@@ -747,6 +788,7 @@ function sendReview() {
 }
 
 // UIにデータを反映させる共通処理
+// ▼ 読み込み処理を上書き
 window.applyDataToUI = function(data) {
   ['title', 'studentId', 'name', 'purpose', 'impression', 'finalDiscussion'].forEach(id => { 
     if (data[id]) { document.getElementById(id).value = data[id]; } 
@@ -755,7 +797,8 @@ window.applyDataToUI = function(data) {
     document.getElementById("mainContainer").innerHTML = ""; 
     document.getElementById("initialButtons").style.display = "none";
     data.sections.forEach(secData => { 
-      document.getElementById("mainContainer").appendChild(createSectionElement(secData.type, secData.fields)); 
+      // ★保存してあった独自セクションの名前も一緒に読み込む
+      document.getElementById("mainContainer").appendChild(createSectionElement(secData.type, secData.fields, secData.customName)); 
     });
   }
   document.querySelectorAll("textarea:not(#output)").forEach(el => { autoResize(el); });
