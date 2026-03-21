@@ -476,10 +476,10 @@
 
   /* ▼ 入力欄（textarea）をコンパクトにする魔法 ▼ */
   textarea:not(#output):not(#reviewText) {
-    min-height: auto !important; /* 最小の高さを解除（基本情報も含む！） */
-    padding: 6px 8px !important; /* 内側の上下のスキマを減らす */
+    min-height: 0 !important; /* ★ auto から 0 に変更して強制的に縮める！ */
+    padding: 6px 8px !important; 
     line-height: 1.5 !important;
-    overflow-y: hidden !important; /* 余分なスクロールバーを隠す */
+    overflow-y: hidden !important; 
   }
 </style>
 </head>
@@ -626,12 +626,12 @@ function autoResize(textarea) {
   // ① 絶対に消してはいけないガードレール（出力欄・レビュー欄は高さ調整を無視する）
   if (textarea.id === "output" || textarea.id === "reviewText") return; 
 
-  // ② 高さを一旦リセットして計算し直せるようにする
-  textarea.style.height = 'auto';
+  // ② ★ここを変更！ 'auto' だとデフォルトの2行と勘違いされるので、一旦 '1px' にして限界まで潰す！
+  textarea.style.height = '1px';
 
-  // ③ 空っぽの時は1行（約34px）、文字があれば中身の高さ（scrollHeight）に合わせる
+  // ③ 空っぽの時は1行（約34px）、文字があれば中身の本当の高さ（scrollHeight）に合わせる
   if (textarea.value === "") {
-    textarea.style.height = "34px"; // ※CSSに合わせて微調整が必要ならこの数字を変えます
+    textarea.style.height = "34px"; 
   } else {
     textarea.style.height = textarea.scrollHeight + 'px';
   }
