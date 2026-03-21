@@ -441,6 +441,46 @@
     clear: both;
     margin-bottom: 8px !important; /* タイトルと名前の間の「絶妙なスキマ」を指定 */
   }
+  /* ▼ 左側画面の無駄な余白を削ってギュッとさせる魔法 ▼ */
+
+  /* セクション（枠）自体の内側・外側のスキマを減らす */
+  .section {
+    padding: 10px 12px !important;
+    margin-bottom: 12px !important;
+  }
+
+  /* 各入力項目（目的、コード、内容など）の間のスキマを減らす */
+  .field-unit {
+    margin-bottom: 6px !important;
+  }
+
+  /* 見出しラベル（【小見出し】など）の下のスキマを極小に */
+  .field-header {
+    margin-bottom: 2px !important;
+  }
+
+  /* 見出しラベル自体の文字も少し小さくして圧迫感を減らす */
+  .field-header label {
+    font-size: 0.9rem !important;
+  }
+
+  /* ツールバー（強調・箇条書きボタン）のスキマを削る */
+  .toolbar {
+    padding: 2px !important;
+    gap: 4px !important;
+  }
+  .btn-tool {
+    padding: 2px 6px !important;
+    font-size: 0.75rem !important;
+  }
+
+  /* ▼ 入力欄（textarea）をコンパクトにする魔法 ▼ */
+  .dynamic-textarea {
+    min-height: auto !important; /* 最小の高さを解除 */
+    padding: 6px 8px !important; /* 内側の上下のスキマを減らす */
+    line-height: 1.5 !important;
+    overflow-y: hidden !important; /* 余分なスクロールバーを隠す */
+  }
 </style>
 </head>
 <body>
@@ -581,15 +621,44 @@ function toggleTheme() {
   document.getElementById('themeToggleBtn').innerHTML = isDark ? '☀️ ライトモードに切り替え' : '🌙 ダークモードに切り替え';
 }
 
+// ▼ 完全版：出力欄を守りつつ、入力欄を1行からスタートさせる
 function autoResize(textarea) {
+  // ① 絶対に消してはいけないガードレール（出力欄・レビュー欄は高さ調整を無視する）
   if (textarea.id === "output" || textarea.id === "reviewText") return; 
+
+  // ② 高さを一旦リセットして計算し直せるようにする
   textarea.style.height = 'auto';
-  textarea.style.height = textarea.scrollHeight + 'px';
+
+  // ③ 空っぽの時は1行（約34px）、文字があれば中身の高さ（scrollHeight）に合わせる
+  if (textarea.value === "") {
+    textarea.style.height = "34px"; // ※CSSに合わせて微調整が必要ならこの数字を変えます
+  } else {
+    textarea.style.height = textarea.scrollHeight + 'px';
+  }
 }
 
+// ▼ 合体版：高さ自動調整 ＋ 画像ドラッグ＆ドロップ機能
 function setupTextarea(textarea) {
-  textarea.addEventListener('dragover', (e) => { e.preventDefault(); textarea.classList.add('dragover'); });
-  textarea.addEventListener('dragleave', () => { textarea.classList.remove('dragover'); });
+  // ---------------------------------------------------
+  // ① 今回追加する「入力時の高さ調整」と「初期1行化」
+  // ---------------------------------------------------
+  textarea.addEventListener('input', function() {
+    autoResize(this);
+  });
+  
+  // 画面に出た瞬間に1行にする魔法
+  autoResize(textarea);
+
+  // ---------------------------------------------------
+  // ② 絶対に消しちゃダメな「画像ドラッグ＆ドロップ」処理（元のコード）
+  // ---------------------------------------------------
+  textarea.addEventListener('dragover', (e) => { 
+    e.preventDefault(); 
+    textarea.classList.add('dragover'); 
+  });
+  textarea.addEventListener('dragleave', () => { 
+    textarea.classList.remove('dragover'); 
+  });
   textarea.addEventListener('drop', (e) => {
     e.preventDefault();
     textarea.classList.remove('dragover');
