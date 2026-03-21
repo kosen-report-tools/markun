@@ -481,22 +481,78 @@
     line-height: 1.5 !important;
     overflow-y: hidden !important; 
   }
+  /* ▼ 目次サイドバーのデザイン ▼ */
+  .toc-sidebar {
+    flex: 0 0 160px; /* 幅を160pxに固定（縮まない） */
+    background: var(--guide-bg);
+    border-right: 3px solid var(--border-main);
+    padding: 20px 10px;
+    overflow-y: auto; /* 目次が増えてもスクロール可能 */
+    height: 100vh;
+    box-sizing: border-box;
+    z-index: 50;
+  }
+
+  .toc-sidebar-title {
+    font-size: 0.9rem;
+    font-weight: 900;
+    margin-bottom: 15px;
+    color: var(--text-main);
+    text-align: center;
+    border-bottom: 2px solid var(--border-main);
+    padding-bottom: 5px;
+  }
+
+  .toc-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 8px;
+    margin-bottom: 8px;
+    background: var(--bg-box);
+    border: 1px solid var(--border-main);
+    border-left: 5px solid var(--blue-green); /* アクセントカラー */
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    color: var(--text-main);
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis; /* 長い文字は「...」にする */
+    transition: all 0.2s ease;
+  }
+
+  .toc-btn:hover {
+    background: var(--blue-green);
+    color: #fff;
+    transform: translateX(2px); /* ホバーで少し右に動く遊び心 */
+  }
+
+  /* ダークモード時のサイドバー調整 */
+  body.dark-mode .toc-sidebar {
+    background: #1a1a1a;
+  }
+  body.dark-mode .toc-btn {
+    background: #2d2d2d;
+  }
+  body.dark-mode .toc-btn:hover {
+    background: var(--blue-green);
+  }
 </style>
 </head>
 <body>
 
 <div class="main-wrapper">
+
+  <div id="tocSidebar" class="toc-sidebar"></div>
+
   <div class="editor-side">
     <span style="display: block; color: var(--pure-red); font-size: 0.9rem; font-weight: bold; margin-bottom: 2px;">Markdownレポート作成ツール</span>
     <div style="display: flex; align-items: center; margin-bottom: 10px;">
       <h1>Mar君😎</h1>
       <div class="header-controls">
-        <select id="tocSelect" class="theme-toggle-btn" onchange="jumpToSection(this.value)" style="appearance: none; text-align: center; margin-right: 5px;">
-          <option value="">📑 目次へジャンプ...</option>
-        </select>
-        
         <button id="themeToggleBtn" class="theme-toggle-btn" onclick="toggleTheme()">🌙 ダークモードに切り替え</button>
-        
         <button id="loginBtn" class="login-btn" onclick="login()">Googleでログイン</button>
         
         <div id="userArea" class="user-badge">
@@ -1089,15 +1145,19 @@ document.addEventListener("input", (e) => { if(e.target.tagName === "TEXTAREA") 
 // =========================================
 
 // 目次を最新の状態に更新する
-function updateTOC() {
-  const select = document.getElementById("tocSelect");
-  if (!select) return;
-  
-  // 一旦中身をリセット
-  select.innerHTML = '<option value="">📑 目次へジャンプ...</option>';
-  select.innerHTML += '<option value="basicInfoSection">📌 基本情報</option>';
+// =========================================
+// ▼ 新機能：目次ジャンプ関連の処理（サイドバー版） ▼
+// =========================================
 
-  // 追加されたセクションを上から順に取得して目次に追加
+function updateTOC() {
+  const sidebar = document.getElementById("tocSidebar");
+  if (!sidebar) return;
+  
+  // 目次のタイトルと基本情報ボタン
+  let html = '<div class="toc-sidebar-title">📑 目次</div>';
+  html += '<button class="toc-btn" onclick="jumpToSection(\'basicInfoSection\')">📌 基本情報</button>';
+
+  // 追加されたセクションのボタンを生成
   document.querySelectorAll(".section").forEach(s => {
     let title = "";
     if (s.dataset.type === "subheading" || s.dataset.type === "custom") {
@@ -1106,11 +1166,24 @@ function updateTOC() {
       const titleEl = s.querySelector(".section-title");
       title = "🔸 " + (titleEl ? titleEl.textContent : "セクション");
     }
-    select.innerHTML += `<option value="${s.id}">${title}</option>`;
+    html += `<button class="toc-btn" onclick="jumpToSection('${s.id}')">${title}</button>`;
   });
 
-  select.innerHTML += '<option value="summarySection">📌 全体まとめ</option>';
+  // 全体まとめボタン（色はマスタード色で目立たせる！）
+  html += '<button class="toc-btn" style="border-left-color: var(--mustard); margin-top: 20px;" onclick="jumpToSection(\'summarySection\')">📌 全体まとめ</button>';
+  
+  sidebar.innerHTML = html;
 }
+
+// 選んだ場所にスムーズにスクロールする
+window.jumpToSection = function(id) {
+  if (!id) return;
+  const target = document.getElementById(id);
+  if (target) {
+    // scrollIntoViewでターゲットの位置へ移動
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+};
 
 // 選んだ場所にスムーズにスクロールする
 window.jumpToSection = function(id) {
